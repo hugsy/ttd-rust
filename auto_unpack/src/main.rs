@@ -6,6 +6,8 @@
 //
 use std::io::{Read, Write};
 
+use iced_x86::{DecoderOptions, Formatter, IntelFormatter};
+
 use anyhow::{Ok, Result, bail};
 use extfmt::{AsHexdump, hexdump};
 use log::{debug, info};
@@ -88,13 +90,10 @@ fn main() -> Result<()> {
         Ok(u32::from_le_bytes(data))
     };
 
-    let fmt = zydis::Formatter::intel();
-    let dec = {
-        match cursor.thread_context()? {
-            RegisterContext::X86(_) => zydis::Decoder::new32(),
-            RegisterContext::X64(_) => zydis::Decoder::new64(),
-            RegisterContext::ARM64(_) => todo!("use bad64"),
-        }
+    let bitness = match cursor.thread_context()? {
+        RegisterContext::X86(_) => 32u32,
+        RegisterContext::X64(_) => 64u32,
+        RegisterContext::ARM64(_) => todo!("use bad64"),
     };
 
     let mut yara_compiler = yara_x::Compiler::new();
@@ -195,17 +194,17 @@ fn main() -> Result<()> {
         //
         {
             info!("Dumping shellcode at IP={:x} (sz={}) executed at {}", pc, arg1, cursor.position()?);
-            let decoder_iter = dec.decode_all::<zydis::VisibleOperands>(&mem, pc);
-            for (idx, insn_info) in decoder_iter.enumerate() {
+            let mut decoder = iced_x86::Decoder::with_ip(bitness, &mem, pc, DecoderOptions::NONE);
+            let mut formatter = IntelFormatter::new();
+            let mut output = String::new();
+            for (idx, insn) in decoder.iter().enumerate() {
                 if idx == NUMBER_OF_INSTRUCTIONS_TO_PRINT {
                     println!("...");
                     break;
                 }
-
-                let insn_info = insn_info?;
-                let ip = insn_info.0;
-                let insn = &insn_info.2;
-                println!("{:#08x} {}", ip, fmt.format(Some(ip), insn)?);
+                output.clear();
+                formatter.format(&insn, &mut output);
+                println!("{:#010x} {}", insn.ip(), output);
             }
         }
 

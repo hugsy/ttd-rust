@@ -55,7 +55,7 @@ cargo build --all-targets
 
 ```pwsh
 cargo build
-ctest -C Debug -T test --test-dir .\ttd\ttd_ffi\build\tests
+ctest -C Debug -T test --test-dir .\ttd_sys\ttd_ffi\build\tests
 ```
 
 ### Test the Rust layer
