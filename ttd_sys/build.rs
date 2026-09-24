@@ -2,7 +2,7 @@
 const _: () = assert!(false, "TTD bindings only work on Windows");
 
 #[cfg(target_arch = "aarch64")]
-panic!("Windows/ARM64 bindings for TTD are not available yet");
+const _: () = assert!(false, "Windows/ARM64 bindings for TTD are not available yet");
 
 #[cfg(target_arch = "x86_64")]
 const ARCH: &str = "x64";
@@ -25,7 +25,6 @@ const WINGET_TTD_INSTALL_PATH: &str =
 const BUILD_TYPE: &str = "Debug";
 #[cfg(not(debug_assertions))]
 const BUILD_TYPE: &str = "Release";
-
 
 const TTD_FFI_BASE_DIR: &str = "./ttd_ffi";
 const TTD_FFI_BUILD_DIR: &str = const_format::formatcp!("{TTD_FFI_BASE_DIR}/build");
