@@ -59,13 +59,20 @@ impl EngineInfo {
         let banner = unsafe { CString::from_vec_unchecked(crate::bindings::root::TTD_FFI::LibraryBanner.to_vec()) };
         let name = unsafe { CString::from_vec_unchecked(crate::bindings::root::TTD_FFI::LibraryName.to_vec()) };
 
+        // Expect banner format to be `ttd_sys v$mj.$mn.$patch`
+        // Failing to extract correctly won't produce an error, just report the version as (0, 0, 0)
+        let banner_str = banner.to_string_lossy();
+        let binding = banner_str.replace("ttd_ffi v", "");
+        let info: Vec<usize> = binding
+            .split(".").map(|x| x.parse().unwrap_or_default()).collect();
+
         EngineInfo {
-            major: crate::bindings::root::TTD_FFI::LibraryVersionMajor,
-            minor: crate::bindings::root::TTD_FFI::LibraryVersionMinor,
-            patch: crate::bindings::root::TTD_FFI::LibraryVersionPatch,
+            major: *info.iter().nth(0).unwrap_or(&0),
+            minor: *info.iter().nth(1).unwrap_or(&0),
+            patch: *info.iter().nth(2).unwrap_or(&0),
             license: license.to_string_lossy().into(),
             author: author.to_string_lossy().into(),
-            banner: banner.to_string_lossy().into(),
+            banner: banner_str.into_owned(),
             name: name.to_string_lossy().into(),
         }
     }

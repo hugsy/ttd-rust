@@ -607,8 +607,22 @@ mod test {
     use crate::replay::{MemoryWatchpointData, ReplayEngine, ReplayPosition};
 
     fn get_test_trace() -> std::path::PathBuf {
+        // Generate with
+        // PS> ttd -out $env:TEMP\test -launch c:\windows\system32\cmd.exe "/c whoami"
         let mut trace_path = std::path::PathBuf::from(std::env::var("TEMP").expect("failed to get TEMP env var").as_str());
         trace_path.push("test.run");
+
+        if !trace_path.exists(){
+            std::process::Command::new("ttd.exe")
+                .args(["-out", trace_path.as_path().to_str().unwrap()])
+                .args(["-launch", r"c:\windows\system32\cmd.exe"])
+                .args(["\"/c whoami\""])
+                .spawn()
+                .unwrap()
+                .wait()
+                .expect("failed to create the test ttd trace");
+        }
+
         trace_path
     }
 
