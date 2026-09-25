@@ -25,34 +25,25 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: actions/cache@v6
+        id: cache-deps
+        env:
+          cache-name: cache-deps
         with:
-         key: ${{ matrix.os }}-${{ matrix.build }}-${{ runner.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+         key: cargo-${{ matrix.os }}-${{ matrix.build }}-${{ hashFiles('**/Cargo.lock') }}
+         restore-keys: cargo-${{ matrix.os }}-${{ matrix.build }}-
          path: |
              ~/.cargo/bin
              ~/.cargo/registry/index
              ~/.cargo/registry/cache
              ~/.cargo/git/db
+             target/debug/deps
+             target/release/deps
 
       - run: |
           rustup update
           rustup component add rustfmt
           rustup show
           cargo install cargo-audit cargo-deny cargo-tarpaulin cargo-chef
-
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        id: cache-deps
-        env:
-          cache-name: cache-deps
-        with:
-          key: cargo-${{ matrix.os }}-${{ matrix.build }}-${{ hashFiles('**/Cargo.lock') }}
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git/db
-            ./target/debug/deps
-            ./target/release/deps
-          restore-keys:
-            cargo-${{ matrix.os }}-${{ matrix.build }}-
 
       - name: Build (debug)
         if: matrix.build == 'debug'
