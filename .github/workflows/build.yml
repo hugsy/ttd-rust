@@ -22,7 +22,16 @@ jobs:
     name: ${{ matrix.os }}/${{ matrix.build }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+         key: ${{ matrix.os }}-${{ matrix.build }}-${{ runner.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+         path: |
+             ~/.cargo/bin
+             ~/.cargo/registry/index
+             ~/.cargo/registry/cache
+             ~/.cargo/git/db
 
       - run: |
           rustup update
