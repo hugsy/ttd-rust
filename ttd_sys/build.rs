@@ -1,6 +1,9 @@
 #[cfg(not(target_os = "windows"))]
 const _: () = assert!(false, "TTD bindings only work on Windows");
 
+#[cfg(target_arch = "aarch64")]
+const _: () = assert!(false, "Windows/ARM64 bindings for TTD are not available yet");
+
 #[cfg(target_arch = "x86_64")]
 const ARCH: &str = "x64";
 
@@ -13,7 +16,7 @@ const NUGET_DOWNLOAD_LINK: &str = const_format::formatcp!(
     "https://globalcdn.nuget.org/packages/{TTD_SDK_PACKAGE_NAME}.{TTD_SDK_PACKAGE_VERSION}.nupkg?packageVersion={TTD_SDK_PACKAGE_VERSION}",
 );
 const WINGET_TTD_PACKAGE_NAME: &str = "Microsoft.TimeTravelDebugging";
-const WINGET_TTD_PACKAGE_VERSION: &str = "1.11.553.0";
+const WINGET_TTD_PACKAGE_VERSION: &str = "1.11.611.0";
 const WINGET_TTD_PACKAGE_ID: &str = "8wekyb3d8bbwe";
 const WINGET_TTD_INSTALL_PATH: &str =
     const_format::formatcp!("C:\\Program Files\\WindowsApps\\{WINGET_TTD_PACKAGE_NAME}_{WINGET_TTD_PACKAGE_VERSION}_{ARCH}__{WINGET_TTD_PACKAGE_ID}");
@@ -23,9 +26,7 @@ const BUILD_TYPE: &str = "Debug";
 #[cfg(not(debug_assertions))]
 const BUILD_TYPE: &str = "Release";
 
-const BASE_DIR: &str = "./ttd";
-
-const TTD_FFI_BASE_DIR: &str = "../ttd_ffi";
+const TTD_FFI_BASE_DIR: &str = "./ttd_ffi";
 const TTD_FFI_BUILD_DIR: &str = const_format::formatcp!("{TTD_FFI_BASE_DIR}/build");
 const TTD_FFI_INSTALL_DIR: &str = const_format::formatcp!("{TTD_FFI_BASE_DIR}/install");
 const TTD_FFI_INSTALL_INCLUDE_DIR: &str = const_format::formatcp!("{TTD_FFI_INSTALL_DIR}/ttd_ffi/Include");
@@ -136,6 +137,7 @@ fn cmake_build_ffi() {
 }
 
 fn generate_ttd_bindings() {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let ttd_sdk_path = get_ttd_sdk_path();
 
     if BUILD_TYPE == "Debug" {
@@ -144,11 +146,9 @@ fn generate_ttd_bindings() {
 
     // include libs
     {
-        assert!(
-            std::path::Path::new(TTD_FFI_INSTALL_LIBRARY_DIR).exists(),
-            "{TTD_FFI_INSTALL_LIBRARY_DIR} should exist but doesn't"
-        );
-        println!("cargo:rustc-link-search={}", TTD_FFI_INSTALL_LIBRARY_DIR);
+        let lib_dir = format!("{}/{}", manifest_dir, TTD_FFI_INSTALL_LIBRARY_DIR);
+        assert!(std::path::Path::new(&lib_dir).exists(), "{lib_dir} should exist but doesn't");
+        println!("cargo:rustc-link-search={}", lib_dir);
         println!("cargo:rustc-link-lib=ttd_ffi");
 
         let mut lib_path = ttd_sdk_path.clone();
@@ -162,7 +162,6 @@ fn generate_ttd_bindings() {
 
     // Create the binding files
     {
-        println!("cargo:rustc-link-search={}/{}", BASE_DIR, TTD_FFI_INSTALL_LIBRARY_DIR);
         let src = std::path::PathBuf::from(format!("{}/{}", TTD_FFI_INSTALL_INCLUDE_DIR, "ttd_ffi.hpp"));
         let dst = std::path::PathBuf::from("./src/bindings.rs");
         let bindings = bindgen::Builder::default()
@@ -273,6 +272,10 @@ const TTD_PACKAGE_VERSION: &str = \"{}\";
 }
 
 fn main() {
+    if std::env::var("DOCS_RS").is_ok() {
+        return;
+    }
+
     if !std::fs::exists(get_ttd_sdk_path()).unwrap() {
         download_nuget_package(TTD_SDK_PACKAGE_NAME, TTD_SDK_PACKAGE_VERSION);
     }

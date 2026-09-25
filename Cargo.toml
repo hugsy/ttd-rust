@@ -9,6 +9,7 @@ edition = "2024"
 description = "Rust bindings for Microsoft TTD"
 readme = "./README.md"
 license = "Apache-2.0"
+repository = "https://github.com/hugsy/ttd-rust"
 
 [profile.dev]
 panic = "abort"

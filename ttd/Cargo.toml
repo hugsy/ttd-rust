@@ -2,13 +2,22 @@
 name = "ttd"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+description.workspace = true
+readme.workspace = true
 license.workspace = true
+repository.workspace = true
+
+[package.metadata.docs.rs]
+targets = ["x86_64-pc-windows-msvc"]
+rustdoc-args = ["--cfg", "docsrs"]
+no-default-features = true
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-ttd_sys = { path = "../ttd_sys", version = "*", default-features = false }
+ttd_sys = { path = "../ttd_sys", version = "0.1", default-features = false }
 bitflags = "2.10.0"
 chrono = "0.4.42"
 derive_more = { version = "2.0.1", features = ["from", "debug", "display"] }

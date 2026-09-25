@@ -22,28 +22,28 @@ jobs:
     name: ${{ matrix.os }}/${{ matrix.build }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        id: cache-deps
+        env:
+          cache-name: cache-deps
+        with:
+         key: cargo-${{ matrix.os }}-${{ matrix.build }}-${{ hashFiles('**/Cargo.lock') }}
+         restore-keys: cargo-${{ matrix.os }}-${{ matrix.build }}-
+         path: |
+             ~/.cargo/bin
+             ~/.cargo/registry/index
+             ~/.cargo/registry/cache
+             ~/.cargo/git/db
+             target/debug/deps
+             target/release/deps
 
       - run: |
           rustup update
           rustup component add rustfmt
           rustup show
           cargo install cargo-audit cargo-deny cargo-tarpaulin cargo-chef
-
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        id: cache-deps
-        env:
-          cache-name: cache-deps
-        with:
-          key: cargo-${{ matrix.os }}-${{ matrix.build }}-${{ hashFiles('**/Cargo.lock') }}
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git/db
-            ./target/debug/deps
-            ./target/release/deps
-          restore-keys:
-            cargo-${{ matrix.os }}-${{ matrix.build }}-
 
       - name: Build (debug)
         if: matrix.build == 'debug'
@@ -67,16 +67,16 @@ jobs:
         if: matrix.build == 'debug'
         run: |
           cp .\ttd*.dll .\target\debug\deps\
-          cp .\ttd*.dll .\ttd_ffi\build\tests\
-          ctest --build-config Debug -T test --test-dir .\ttd_ffi\build\tests
+          cp .\ttd*.dll .\ttd_sys\ttd_ffi\build\tests\
+          ctest --build-config Debug -T test --test-dir .\ttd_sys\ttd_ffi\build\tests
           cargo test
 
       - name: Run Tests (release)
         if: matrix.build == 'release'
         run: |
           cp .\ttd*.dll .\target\release\deps\
-          cp .\ttd*.dll .\ttd_ffi\build\tests\
-          ctest --build-config Release -T test --test-dir .\ttd_ffi\build\tests
+          cp .\ttd*.dll .\ttd_sys\ttd_ffi\build\tests\
+          ctest --build-config Release -T test --test-dir .\ttd_sys\ttd_ffi\build\tests
           cargo test --release
 
       - name: Upload Artifact
@@ -85,10 +85,10 @@ jobs:
           name: ttd_${{ matrix.build }}_${{ matrix.os }}_${{ github.sha }}
           if-no-files-found: warn
           path: |
-            ./ttd_ffi/install/ttd_ffi_tests/tests/*.exe
-            ./ttd_ffi/install/ttd_ffi_tests/tests/*.pdb
-            ./ttd_ffi/install/*.exe
-            ./ttd_ffi/install/*.pdb
+            ./ttd_sys/ttd_ffi/install/ttd_ffi_tests/tests/*.exe
+            ./ttd_sys/ttd_ffi/install/ttd_ffi_tests/tests/*.pdb
+            ./ttd_sys/ttd_ffi/install/*.exe
+            ./ttd_sys/ttd_ffi/install/*.pdb
             ./TTD*.dll
             ./target/**/*.rlib
             ./target/**/*.exe
