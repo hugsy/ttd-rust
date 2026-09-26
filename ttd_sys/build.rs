@@ -1,13 +1,8 @@
-#![allow(dead_code)]
-use std::path::PathBuf;
-
 #[cfg(not(target_os = "windows"))]
 const _: () = assert!(false, "TTD bindings only work on Windows");
 
-#[cfg(debug_assertions)]
-const BUILD_TYPE: &str = "Debug";
-#[cfg(not(debug_assertions))]
-const BUILD_TYPE: &str = "Release";
+#[cfg(target_arch = "aarch64")]
+const _: () = assert!(false, "Windows/ARM64 bindings for TTD are not available yet");
 
 #[cfg(target_arch = "x86_64")]
 const ARCH: &str = "x64";
@@ -17,71 +12,25 @@ const ARCH: &str = "arm64";
 
 const TTD_SDK_PACKAGE_NAME: &str = "microsoft.timetraveldebugging.apis";
 const TTD_SDK_PACKAGE_VERSION: &str = "0.9.5";
-
-fn get_ttd_sdk_version() -> String {
-    std::env::var("TTD_SDK_PACKAGE_VERSION").unwrap_or(TTD_SDK_PACKAGE_VERSION.to_string())
-}
-
-fn get_nuget_ttd_download_link() -> String {
-    let package_version = get_ttd_sdk_version();
-    format!("https://globalcdn.nuget.org/packages/{TTD_SDK_PACKAGE_NAME}.{package_version}.nupkg?packageVersion={package_version}",)
-}
-
+const NUGET_DOWNLOAD_LINK: &str = const_format::formatcp!(
+    "https://globalcdn.nuget.org/packages/{TTD_SDK_PACKAGE_NAME}.{TTD_SDK_PACKAGE_VERSION}.nupkg?packageVersion={TTD_SDK_PACKAGE_VERSION}",
+);
 const WINGET_TTD_PACKAGE_NAME: &str = "Microsoft.TimeTravelDebugging";
+const WINGET_TTD_PACKAGE_VERSION: &str = "1.11.611.0";
 const WINGET_TTD_PACKAGE_ID: &str = "8wekyb3d8bbwe";
-const WINGET_TTD_PACKAGE_VERSION: &str = "1.11.553.0";
+const WINGET_TTD_INSTALL_PATH: &str =
+    const_format::formatcp!("C:\\Program Files\\WindowsApps\\{WINGET_TTD_PACKAGE_NAME}_{WINGET_TTD_PACKAGE_VERSION}_{ARCH}__{WINGET_TTD_PACKAGE_ID}");
 
-fn get_winget_ttd_package_version() -> String {
-    std::env::var("WINGET_TTD_PACKAGE_VERSION").unwrap_or(WINGET_TTD_PACKAGE_VERSION.to_string())
-}
+#[cfg(debug_assertions)]
+const BUILD_TYPE: &str = "Debug";
+#[cfg(not(debug_assertions))]
+const BUILD_TYPE: &str = "Release";
 
-fn get_winget_ttd_install_path() -> PathBuf {
-    let mut path = PathBuf::from(r"C:\Program Files\WindowsApps");
-    let fname = format!(
-        "{}_{}_{}__{}",
-        WINGET_TTD_PACKAGE_NAME,
-        get_winget_ttd_package_version(),
-        ARCH,
-        WINGET_TTD_PACKAGE_ID
-    );
-    path.push(fname.as_str());
-    path
-}
-
-fn get_package_root() -> PathBuf {
-    PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default())
-        .parent()
-        .unwrap()
-        .to_path_buf()
-}
-
-fn get_ttd_base_dir() -> PathBuf {
-    get_package_root().join("ttd")
-}
-
-fn get_ttd_ffi_base_dir() -> PathBuf {
-    get_package_root().join("ttd_ffi")
-}
-
-fn get_ttd_sys_base_dir() -> PathBuf {
-    get_package_root().join("ttd_sys")
-}
-
-fn get_ttd_ffi_build_dir() -> PathBuf {
-    get_ttd_ffi_base_dir().join("build")
-}
-
-fn get_ttd_ffi_install_dir() -> PathBuf {
-    get_ttd_ffi_base_dir().join("install")
-}
-
-fn get_ttd_ffi_install_include_dir() -> PathBuf {
-    get_ttd_ffi_install_dir().join("ttd_ffi/Include")
-}
-
-fn get_ttd_ffi_install_library_dir() -> PathBuf {
-    get_ttd_ffi_install_dir().join("ttd_ffi/Library")
-}
+const TTD_FFI_BASE_DIR: &str = "./ttd_ffi";
+const TTD_FFI_BUILD_DIR: &str = const_format::formatcp!("{TTD_FFI_BASE_DIR}/build");
+const TTD_FFI_INSTALL_DIR: &str = const_format::formatcp!("{TTD_FFI_BASE_DIR}/install");
+const TTD_FFI_INSTALL_INCLUDE_DIR: &str = const_format::formatcp!("{TTD_FFI_INSTALL_DIR}/ttd_ffi/Include");
+const TTD_FFI_INSTALL_LIBRARY_DIR: &str = const_format::formatcp!("{TTD_FFI_INSTALL_DIR}/ttd_ffi/Library");
 
 const TTD_DLLS: [&str; 7] = [
     "TTDLiveRecorder.dll",
@@ -116,19 +65,13 @@ fn get_ttd_sdk_path() -> std::path::PathBuf {
 }
 
 fn download_nuget_package(package_name: &str, version: &str) -> std::path::PathBuf {
-    let download_link = format!(
-        "https://globalcdn.nuget.org/packages/{}.{}.nupkg?packageVersion={}",
-        package_name,
-        version,
-        version
-    );
     let download_dir = get_nuget_pkg_path();
     std::fs::create_dir_all(&download_dir).unwrap();
 
     let package_path = download_dir.join(format!("{}.{}.nupkg", package_name, version));
     let extract_path = download_dir.join(format!("{}/{}", package_name, version));
 
-    let mut response = reqwest::blocking::get(download_link.as_str()).unwrap();
+    let mut response = reqwest::blocking::get(NUGET_DOWNLOAD_LINK).unwrap();
     let mut dest_file = std::fs::File::create(&package_path).unwrap();
     std::io::copy(&mut response, &mut dest_file).unwrap();
 
@@ -140,16 +83,12 @@ fn download_nuget_package(package_name: &str, version: &str) -> std::path::PathB
 }
 
 fn cmake_build_ffi() {
-    let ttd_rs_ffi_base_dir = get_ttd_ffi_base_dir();
-    let ttd_rs_ffi_build_dir = get_ttd_ffi_build_dir();
-    let ttd_rs_ffi_install_library_dir = get_ttd_ffi_install_library_dir();
-
     // CMake configure
     {
         assert!(
             std::process::Command::new("cmake")
-                .args(["-S", ttd_rs_ffi_base_dir.to_str().unwrap()])
-                .args(["-B", ttd_rs_ffi_build_dir.to_str().unwrap()])
+                .args(["-S", TTD_FFI_BASE_DIR])
+                .args(["-B", TTD_FFI_BUILD_DIR])
                 .spawn()
                 .unwrap()
                 .wait()
@@ -162,7 +101,7 @@ fn cmake_build_ffi() {
     {
         assert!(
             std::process::Command::new("cmake")
-                .args(["--build", ttd_rs_ffi_build_dir.to_str().unwrap()])
+                .args(["--build", TTD_FFI_BUILD_DIR])
                 .args(["--parallel", &get_nb_cpu()])
                 .args(["--config", BUILD_TYPE])
                 // .args(["--", "-D_LIBTTD_VERBOSE_OUTPUT"]) // Uncomment for verbose output from ttd_ffi
@@ -178,9 +117,9 @@ fn cmake_build_ffi() {
     {
         assert!(
             std::process::Command::new("cmake")
-                .args(["--install", ttd_rs_ffi_build_dir.to_str().unwrap()])
+                .args(["--install", TTD_FFI_BUILD_DIR])
                 .args(["--config", BUILD_TYPE])
-                .args(["--prefix", get_ttd_ffi_install_dir().to_str().unwrap()])
+                .args(["--prefix", TTD_FFI_INSTALL_DIR])
                 .spawn()
                 .unwrap()
                 .wait()
@@ -189,22 +128,17 @@ fn cmake_build_ffi() {
         );
     }
 
-    // We need to watch changes on those specific files for recompilation
-    let watched_files = [
-        ttd_rs_ffi_base_dir.join("src/ttd_ffi.cpp"),
-        ttd_rs_ffi_base_dir.join("src/constants.hpp.in"),
-        get_ttd_ffi_install_include_dir().join("ttd_ffi.hpp"),
-    ];
-
-    for f in watched_files.as_ref() {
-        assert!(f.exists(), "{} should exist but doesn't", f.to_string_lossy());
-        println!("cargo:rerun-if-changed={}", f.to_string_lossy());
+    {
+        for hdr in ["ttd_ffi.cpp", "ttd_ffi.hpp", "constants.hpp.in"] {
+            let header_path = format!("{}/{}", TTD_FFI_INSTALL_INCLUDE_DIR, hdr);
+            println!("cargo:rerun-if-changed={}", header_path.as_str());
+        }
     }
 }
 
 fn generate_ttd_bindings() {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let ttd_sdk_path = get_ttd_sdk_path();
-    let ttd_ffi_install_lib_dir = get_ttd_ffi_install_library_dir();
 
     if BUILD_TYPE == "Debug" {
         println!("cargo:rustc-link-lib=dylib=ucrtd");
@@ -212,12 +146,9 @@ fn generate_ttd_bindings() {
 
     // include libs
     {
-        assert!(
-            ttd_ffi_install_lib_dir.exists(),
-            "{} should exist but doesn't",
-            ttd_ffi_install_lib_dir.to_string_lossy()
-        );
-        println!("cargo:rustc-link-search={}", ttd_ffi_install_lib_dir.to_string_lossy());
+        let lib_dir = format!("{}/{}", manifest_dir, TTD_FFI_INSTALL_LIBRARY_DIR);
+        assert!(std::path::Path::new(&lib_dir).exists(), "{lib_dir} should exist but doesn't");
+        println!("cargo:rustc-link-search={}", lib_dir);
         println!("cargo:rustc-link-lib=ttd_ffi");
 
         let mut lib_path = ttd_sdk_path.clone();
@@ -231,15 +162,13 @@ fn generate_ttd_bindings() {
 
     // Create the binding files
     {
-        let inc = get_ttd_ffi_install_include_dir();
-        let ttd_sys_dir = get_ttd_sys_base_dir();
-        let src = inc.join("ttd_ffi.hpp");
-        let dst = ttd_sys_dir.join("src/bindings.rs");
+        let src = std::path::PathBuf::from(format!("{}/{}", TTD_FFI_INSTALL_INCLUDE_DIR, "ttd_ffi.hpp"));
+        let dst = std::path::PathBuf::from("./src/bindings.rs");
         let bindings = bindgen::Builder::default()
             .generate_comments(true)
             .header(src.as_path().to_string_lossy())
             .clang_args(["-x", "c++", "-std=c++23"])
-            .clang_arg(format!("-I{}", inc.to_str().unwrap()))
+            .clang_arg(format!("-I{}", TTD_FFI_INSTALL_INCLUDE_DIR))
             .opaque_type("std::.*")
             .use_core()
             .opaque_type("TTD::TBufferView.*")
@@ -283,7 +212,6 @@ fn generate_ttd_bindings() {
 }
 
 fn install_winget_ttd() {
-    let install_dir = get_winget_ttd_install_path();
     std::process::Command::new("winget")
         .args([
             "install",
@@ -301,12 +229,15 @@ fn install_winget_ttd() {
         .wait()
         .expect("failed to install ttd");
 
-    assert!(install_dir.exists(), "{} doesn't exist but should", install_dir.to_string_lossy());
+    assert!(
+        std::fs::exists(WINGET_TTD_INSTALL_PATH).unwrap(),
+        "{} doesn't exist but should",
+        WINGET_TTD_INSTALL_PATH
+    );
 }
 
 fn copy_ttd_dlls() {
-    let install_dir = get_winget_ttd_install_path();
-    let ttd_dll_glob = format!("{}/*.dll", install_dir.to_string_lossy());
+    let ttd_dll_glob = format!("{WINGET_TTD_INSTALL_PATH}/*.dll");
     for entry in glob::glob(&ttd_dll_glob).unwrap() {
         let Ok(entry) = entry else {
             continue;
@@ -322,7 +253,7 @@ fn copy_ttd_dlls() {
 
 fn generate_constant_file() {
     std::fs::write(
-        get_ttd_sys_base_dir().join("src/constants.rs"),
+        "./src/constants.rs",
         format!(
             "//! Auto-generated constants
 #![allow(unused)]
@@ -334,24 +265,27 @@ const TTD_PACKAGE_NAME: &str = \"{}\";
 const TTD_PACKAGE_VERSION: &str = \"{}\";
 
 ",
-            TTD_SDK_PACKAGE_NAME,
-            get_ttd_sdk_version().as_str()
+            TTD_SDK_PACKAGE_NAME, TTD_SDK_PACKAGE_VERSION
         ),
     )
     .unwrap();
 }
 
 fn main() {
-    if !get_ttd_sdk_path().exists() {
-        download_nuget_package(TTD_SDK_PACKAGE_NAME, get_ttd_sdk_version().as_str());
+    if std::env::var("DOCS_RS").is_ok() {
+        return;
+    }
+
+    if !std::fs::exists(get_ttd_sdk_path()).unwrap() {
+        download_nuget_package(TTD_SDK_PACKAGE_NAME, TTD_SDK_PACKAGE_VERSION);
     }
 
     for dll in TTD_DLLS {
-        let path = get_package_root().join(dll);
-        if !path.exists() {
+        let path = std::path::PathBuf::from(format!("../{dll}"));
+        if !std::fs::exists(&path).unwrap() {
             install_winget_ttd();
             copy_ttd_dlls();
-            assert!(path.exists(), "{} doesn't exist but should", path.to_string_lossy());
+            assert!(std::fs::exists(&path).unwrap(), "{} doesn't exist but should", &path.to_string_lossy());
         }
     }
 
